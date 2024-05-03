@@ -1,27 +1,55 @@
 pipeline {
     agent any
+    
+    parameters {
+        string(name: 'jobName', description: 'Enter the name of the job:', defaultValue: '', trim: true)
+    }
+    
     stages {
-        stage('Search for job') {
+        stage('Check Job Existence') {
             steps {
-                // Get the job name from the text box
-                def jobName = input message: 'Enter the job name:', parameters: [string(name: 'jobName')]
-
-                // Check if the job exists
-                if (!jobExists(jobName)) {
-                    error "Job name '$jobName' not found"
+                script {
+                    def jobExists = false
+                    def jobList = Jenkins.instance.getAllItems(Job.class)
+                    
+                    for (job in jobList) {
+                        if (job.fullName == params.jobName) {
+                            jobExists = true
+                            break
+                        }
+                    }
+                    
+                    if (!jobExists) {
+                        echo "Job '${params.jobName}' not found."
+                        currentBuild.result = 'FAILURE'
+                        error "Job '${params.jobName}' not found."
+                    }
                 }
             }
         }
-        stage('Run ls on job workspace directory') {
+        
+        stage('List Workspace Directory') {
+            when {
+                expression { currentBuild.result != 'FAILURE' }
+            }
             steps {
-                // Run an ls on the job workspace directory
-                sh "ls -l ${jobName}/workspace"
+                script {
+                    def job = Jenkins.instance.getItemByFullName(params.jobName)
+                    def workspaceDir = job.getLastBuild().getWorkspace()
+                    sh "ls -la ${workspaceDir}"
+                }
             }
         }
-        stage('Back up job workspace directory to AWS S3') {
+        
+        stage('Backup to AWS S3') {
+            when {
+                expression { currentBuild.result != 'FAILURE' }
+            }
             steps {
-                // Run the script to back up the workspace directory to AWS S3
-                sh "backup-script.sh ${jobName}/workspace"
+                // Your script to backup workspace directory to AWS S3
+                // Use AWS CLI or SDK to perform the backup
+                // Example: aws s3 sync ${workspaceDir} s3://your-bucket
+                // Make sure AWS credentials are configured on Jenkins
             }
         }
     }
