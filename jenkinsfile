@@ -1,0 +1,28 @@
+pipeline {
+    agent any
+    stages {
+        stage('Search for job') {
+            steps {
+                // Get the job name from the text box
+                def jobName = input message: 'Enter the job name:', parameters: [string(name: 'jobName')]
+
+                // Check if the job exists
+                if (!jobExists(jobName)) {
+                    error "Job name '$jobName' not found"
+                }
+            }
+        }
+        stage('Run ls on job workspace directory') {
+            steps {
+                // Run an ls on the job workspace directory
+                sh "ls -l ${jobName}/workspace"
+            }
+        }
+        stage('Back up job workspace directory to AWS S3') {
+            steps {
+                // Run the script to back up the workspace directory to AWS S3
+                sh "backup-script.sh ${jobName}/workspace"
+            }
+        }
+    }
+}
